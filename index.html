@@ -190,13 +190,13 @@
 
       .mobile-left {
         left: 14px;
-        width: 170px;
-        height: 170px;
+        width: 180px;
+        height: 180px;
       }
 
       .mobile-right {
         right: 14px;
-        width: 200px;
+        width: 120px;
         height: 170px;
       }
 
@@ -219,38 +219,39 @@
         background: rgba(14, 165, 233, 0.42);
       }
 
-      #btnUp {
-        left: 57px;
-        top: 0;
-      }
-
-      #btnLeft {
-        left: 0;
-        top: 57px;
-      }
-
-      #btnRight {
-        right: 0;
-        top: 57px;
-      }
-
-      #btnDown {
-        left: 57px;
+      .joystick {
+        position: absolute;
+        left: 8px;
         bottom: 0;
+        width: 148px;
+        height: 148px;
+        border-radius: 999px;
+        border: 1px solid rgba(226, 232, 240, 0.35);
+        background: radial-gradient(
+          circle at 35% 35%,
+          rgba(34, 211, 238, 0.2),
+          rgba(2, 6, 23, 0.45)
+        );
+        pointer-events: auto;
+        touch-action: none;
+        user-select: none;
+      }
+
+      .joystick-knob {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        width: 58px;
+        height: 58px;
+        border-radius: 999px;
+        border: 1px solid rgba(226, 232, 240, 0.45);
+        background: rgba(15, 23, 42, 0.75);
+        transform: translate(-50%, -50%);
       }
 
       #btnJump {
-        left: 10px;
-        top: 60px;
-      }
-
-      #btnShoot {
         right: 0;
-        top: 56px;
-        width: 92px;
-        height: 62px;
-        border-radius: 16px;
-        font-size: 16px;
+        top: 60px;
       }
 
       @media (pointer: coarse) {
@@ -281,21 +282,19 @@
       <div class="card">
         <h1>Neon Siege 3D</h1>
         <p>Survive the arena and hold off endless drones.</p>
-        <p class="controls">Desktop: WASD + Mouse + Click | Mobile: Touch buttons + drag to look</p>
+        <p class="controls">Desktop: WASD + Mouse + Click | Mobile: Joystick + Jump + tap enemy to shoot</p>
         <button id="startButton">Start Mission</button>
       </div>
     </div>
 
     <div id="mobileControls" class="mobile-controls">
       <div class="mobile-left">
-        <button id="btnUp" class="touch-btn" aria-label="Move forward">W</button>
-        <button id="btnLeft" class="touch-btn" aria-label="Move left">A</button>
-        <button id="btnRight" class="touch-btn" aria-label="Move right">D</button>
-        <button id="btnDown" class="touch-btn" aria-label="Move backward">S</button>
+        <div id="joystickBase" class="joystick" aria-label="Movement joystick">
+          <div id="joystickKnob" class="joystick-knob"></div>
+        </div>
       </div>
       <div class="mobile-right">
         <button id="btnJump" class="touch-btn" aria-label="Jump">J</button>
-        <button id="btnShoot" class="touch-btn" aria-label="Shoot">Fire</button>
       </div>
     </div>
 

@@ -10,12 +10,9 @@ const enemyCountEl = document.querySelector("#enemyCount");
 const healthBar = document.querySelector("#healthBar");
 const subtitleEl = overlay.querySelector(".card p");
 const mobileControls = document.querySelector("#mobileControls");
-const btnUp = document.querySelector("#btnUp");
-const btnDown = document.querySelector("#btnDown");
-const btnLeft = document.querySelector("#btnLeft");
-const btnRight = document.querySelector("#btnRight");
+const joystickBase = document.querySelector("#joystickBase");
+const joystickKnob = document.querySelector("#joystickKnob");
 const btnJump = document.querySelector("#btnJump");
-const btnShoot = document.querySelector("#btnShoot");
 
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -44,7 +41,9 @@ let mobileSessionActive = false;
 let lookTouchId = null;
 let lastTouchX = 0;
 let lastTouchY = 0;
+let lookTouchMoved = false;
 const pitchEuler = new THREE.Euler(0, 0, 0, "YXZ");
+const JOYSTICK_RADIUS = 44;
 
 const hemiLight = new THREE.HemisphereLight("#67e8f9", "#0f172a", 0.95);
 scene.add(hemiLight);
@@ -125,6 +124,8 @@ const input = {
   left: false,
   right: false,
 };
+const inputAxis = { x: 0, z: 0 };
+const joystick = { activePointerId: null };
 
 const state = {
   started: false,
@@ -306,6 +307,9 @@ function resetGame() {
   input.backward = false;
   input.left = false;
   input.right = false;
+  inputAxis.x = 0;
+  inputAxis.z = 0;
+  resetJoystick();
   subtitleEl.textContent = "Survive the arena and hold off endless drones.";
 
   updateHUD();
@@ -416,7 +420,7 @@ function spawnWebLine(from, to) {
   webLines.push({ mesh: strand, life: 0.35 });
 }
 
-function handleShoot() {
+function handleShoot(aimPoint = null) {
   const canControl = controls.isLocked || mobileSessionActive;
   if (!canControl || !state.alive || !state.started) {
     return;
@@ -429,7 +433,7 @@ function handleShoot() {
   muzzleFlash.intensity = 3;
   playShootSound();
 
-  raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+  raycaster.setFromCamera(aimPoint || new THREE.Vector2(0, 0), camera);
   const targets = enemies.map((e) => e.mesh);
   const hits = raycaster.intersectObjects(targets, true);
 
@@ -458,6 +462,34 @@ function handleShoot() {
   }
 
   updateHUD();
+}
+
+function setJoystickVisual(x, y) {
+  if (!joystickKnob) return;
+  joystickKnob.style.transform = `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`;
+}
+
+function resetJoystick() {
+  joystick.activePointerId = null;
+  inputAxis.x = 0;
+  inputAxis.z = 0;
+  setJoystickVisual(0, 0);
+}
+
+function setJoystickFromClient(clientX, clientY) {
+  if (!joystickBase) return;
+  const rect = joystickBase.getBoundingClientRect();
+  const centerX = rect.left + rect.width / 2;
+  const centerY = rect.top + rect.height / 2;
+  const dx = clientX - centerX;
+  const dy = clientY - centerY;
+  const distance = Math.hypot(dx, dy);
+  const scale = distance > JOYSTICK_RADIUS ? JOYSTICK_RADIUS / distance : 1;
+  const clampedX = dx * scale;
+  const clampedY = dy * scale;
+  inputAxis.x = clampedX / JOYSTICK_RADIUS;
+  inputAxis.z = clampedY / JOYSTICK_RADIUS;
+  setJoystickVisual(clampedX, clampedY);
 }
 
 function lockOrRestart() {
@@ -543,21 +575,13 @@ if (isMobile && mobileControls) {
   mobileControls.classList.remove("hidden");
 }
 
-function bindTouchButton(button, onPress, onRelease) {
+function bindTouchButton(button, onPress) {
   if (!button) return;
-  const release = (event) => {
-    event.preventDefault();
-    event.stopPropagation();
-    onRelease();
-  };
   button.addEventListener("pointerdown", (event) => {
     event.preventDefault();
     event.stopPropagation();
     onPress();
   });
-  button.addEventListener("pointerup", release);
-  button.addEventListener("pointercancel", release);
-  button.addEventListener("lostpointercapture", release);
   button.addEventListener(
     "touchstart",
     (event) => {
@@ -567,76 +591,91 @@ function bindTouchButton(button, onPress, onRelease) {
     },
     { passive: false },
   );
-  button.addEventListener(
-    "touchend",
-    (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      onRelease();
-    },
-    { passive: false },
-  );
-  button.addEventListener(
-    "touchcancel",
-    (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      onRelease();
-    },
-    { passive: false },
+}
+
+bindTouchButton(btnJump, () => {
+  jumpQueued = true;
+});
+
+function getTouchAimPoint(clientX, clientY) {
+  const rect = canvas.getBoundingClientRect();
+  return new THREE.Vector2(
+    ((clientX - rect.left) / rect.width) * 2 - 1,
+    -((clientY - rect.top) / rect.height) * 2 + 1,
   );
 }
 
-bindTouchButton(
-  btnUp,
-  () => {
-    input.forward = true;
-  },
-  () => {
-    input.forward = false;
-  },
-);
-bindTouchButton(
-  btnDown,
-  () => {
-    input.backward = true;
-  },
-  () => {
-    input.backward = false;
-  },
-);
-bindTouchButton(
-  btnLeft,
-  () => {
-    input.left = true;
-  },
-  () => {
-    input.left = false;
-  },
-);
-bindTouchButton(
-  btnRight,
-  () => {
-    input.right = true;
-  },
-  () => {
-    input.right = false;
-  },
-);
-bindTouchButton(
-  btnJump,
-  () => {
-    jumpQueued = true;
-  },
-  () => {},
-);
-bindTouchButton(
-  btnShoot,
-  () => {
-    handleShoot();
-  },
-  () => {},
-);
+function startJoystick(pointerId, clientX, clientY) {
+  joystick.activePointerId = pointerId;
+  setJoystickFromClient(clientX, clientY);
+}
+
+function moveJoystick(clientX, clientY) {
+  setJoystickFromClient(clientX, clientY);
+}
+
+if (isMobile && joystickBase) {
+  joystickBase.addEventListener("pointerdown", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    startJoystick(event.pointerId, event.clientX, event.clientY);
+  });
+
+  joystickBase.addEventListener("pointermove", (event) => {
+    if (joystick.activePointerId !== event.pointerId) return;
+    event.preventDefault();
+    moveJoystick(event.clientX, event.clientY);
+  });
+
+  const stopJoystickPointer = (event) => {
+    if (joystick.activePointerId !== event.pointerId) return;
+    event.preventDefault();
+    resetJoystick();
+  };
+
+  joystickBase.addEventListener("pointerup", stopJoystickPointer);
+  joystickBase.addEventListener("pointercancel", stopJoystickPointer);
+
+  joystickBase.addEventListener(
+    "touchstart",
+    (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const touch = event.changedTouches[0];
+      if (!touch) return;
+      startJoystick(touch.identifier, touch.clientX, touch.clientY);
+    },
+    { passive: false },
+  );
+
+  joystickBase.addEventListener(
+    "touchmove",
+    (event) => {
+      if (joystick.activePointerId === null) return;
+      const touch = Array.from(event.changedTouches).find(
+        (t) => t.identifier === joystick.activePointerId,
+      );
+      if (!touch) return;
+      event.preventDefault();
+      moveJoystick(touch.clientX, touch.clientY);
+    },
+    { passive: false },
+  );
+
+  const stopJoystickTouch = (event) => {
+    if (joystick.activePointerId === null) return;
+    const ended = Array.from(event.changedTouches).some(
+      (t) => t.identifier === joystick.activePointerId,
+    );
+    if (ended) {
+      event.preventDefault();
+      resetJoystick();
+    }
+  };
+
+  joystickBase.addEventListener("touchend", stopJoystickTouch, { passive: false });
+  joystickBase.addEventListener("touchcancel", stopJoystickTouch, { passive: false });
+}
 
 canvas.addEventListener(
   "touchstart",
@@ -647,6 +686,7 @@ canvas.addEventListener(
     lookTouchId = touch.identifier;
     lastTouchX = touch.clientX;
     lastTouchY = touch.clientY;
+    lookTouchMoved = false;
   },
   { passive: true },
 );
@@ -659,6 +699,9 @@ canvas.addEventListener(
     if (!touch) return;
     const dx = touch.clientX - lastTouchX;
     const dy = touch.clientY - lastTouchY;
+    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
+      lookTouchMoved = true;
+    }
     lastTouchX = touch.clientX;
     lastTouchY = touch.clientY;
     pitchEuler.setFromQuaternion(camera.quaternion);
@@ -674,8 +717,25 @@ canvas.addEventListener(
   "touchend",
   (event) => {
     if (!isMobile || lookTouchId === null) return;
+    const touch = Array.from(event.changedTouches).find((t) => t.identifier === lookTouchId);
+    if (touch) {
+      if (!lookTouchMoved) {
+        handleShoot(getTouchAimPoint(touch.clientX, touch.clientY));
+      }
+      lookTouchId = null;
+      lookTouchMoved = false;
+    }
+  },
+  { passive: true },
+);
+
+canvas.addEventListener(
+  "touchcancel",
+  (event) => {
+    if (!isMobile || lookTouchId === null) return;
     if (Array.from(event.changedTouches).some((t) => t.identifier === lookTouchId)) {
       lookTouchId = null;
+      lookTouchMoved = false;
     }
   },
   { passive: true },
@@ -685,6 +745,7 @@ function endGame() {
   state.alive = false;
   state.active = false;
   mobileSessionActive = false;
+  resetJoystick();
   controls.unlock();
   overlay.classList.remove("hidden");
   startButton.textContent = "Restart Mission";
@@ -736,13 +797,13 @@ function updateMovement(delta) {
   }
   jumpQueued = false;
 
-  direction.set(0, 0, 0);
-  if (input.forward) direction.z -= 1;
-  if (input.backward) direction.z += 1;
-  if (input.left) direction.x -= 1;
-  if (input.right) direction.x += 1;
+  const moveX =
+    (input.right ? 1 : 0) - (input.left ? 1 : 0) + (isMobile ? inputAxis.x : 0);
+  const moveZ =
+    (input.backward ? 1 : 0) - (input.forward ? 1 : 0) + (isMobile ? inputAxis.z : 0);
+  direction.set(moveX, 0, moveZ);
 
-  if (direction.lengthSq() > 0) direction.normalize();
+  if (direction.lengthSq() > 1) direction.normalize();
 
   const speed = WALK_SPEED * delta;
   controls.moveRight(direction.x * speed);
