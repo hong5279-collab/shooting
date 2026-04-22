@@ -9,6 +9,13 @@ const waveEl = document.querySelector("#wave");
 const enemyCountEl = document.querySelector("#enemyCount");
 const healthBar = document.querySelector("#healthBar");
 const subtitleEl = overlay.querySelector(".card p");
+const mobileControls = document.querySelector("#mobileControls");
+const btnUp = document.querySelector("#btnUp");
+const btnDown = document.querySelector("#btnDown");
+const btnLeft = document.querySelector("#btnLeft");
+const btnRight = document.querySelector("#btnRight");
+const btnJump = document.querySelector("#btnJump");
+const btnShoot = document.querySelector("#btnShoot");
 
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -32,6 +39,12 @@ camera.position.set(0, 1.75, 8);
 
 const controls = new PointerLockControls(camera, canvas);
 scene.add(controls.getObject());
+const isMobile = window.matchMedia("(pointer: coarse)").matches;
+let mobileSessionActive = false;
+let lookTouchId = null;
+let lastTouchX = 0;
+let lastTouchY = 0;
+const pitchEuler = new THREE.Euler(0, 0, 0, "YXZ");
 
 const hemiLight = new THREE.HemisphereLight("#67e8f9", "#0f172a", 0.95);
 scene.add(hemiLight);
@@ -289,6 +302,10 @@ function resetGame() {
   state.hitFlash = 0;
   velocityY = 0;
   jumpQueued = false;
+  input.forward = false;
+  input.backward = false;
+  input.left = false;
+  input.right = false;
   subtitleEl.textContent = "Survive the arena and hold off endless drones.";
 
   updateHUD();
@@ -400,7 +417,8 @@ function spawnWebLine(from, to) {
 }
 
 function handleShoot() {
-  if (!controls.isLocked || !state.alive || !state.started) {
+  const canControl = controls.isLocked || mobileSessionActive;
+  if (!canControl || !state.alive || !state.started) {
     return;
   }
   if (state.shootCooldown > 0) {
@@ -444,6 +462,14 @@ function handleShoot() {
 
 function lockOrRestart() {
   if (!state.alive) resetGame();
+  if (isMobile) {
+    initAudio();
+    if (!state.started) resetGame();
+    mobileSessionActive = true;
+    state.active = true;
+    overlay.classList.add("hidden");
+    return;
+  }
   if (document.pointerLockElement !== canvas) {
     controls.lock();
   }
@@ -455,6 +481,7 @@ startButton.addEventListener("pointerdown", (event) => {
 });
 startButton.addEventListener("click", lockOrRestart);
 canvas.addEventListener("click", () => {
+  if (isMobile) return;
   if (state.started && state.alive && !controls.isLocked) {
     lockOrRestart();
   }
@@ -469,6 +496,7 @@ controls.addEventListener("lock", () => {
 });
 
 controls.addEventListener("unlock", () => {
+  mobileSessionActive = false;
   state.active = false;
   if (state.alive) {
     overlay.classList.remove("hidden");
@@ -489,9 +517,9 @@ window.addEventListener("keydown", (event) => {
   if (event.code === "KeyS") input.backward = true;
   if (event.code === "KeyA") input.left = true;
   if (event.code === "KeyD") input.right = true;
-  if (event.code === "Space" && !controls.isLocked) {
+  if (event.code === "Space" && !controls.isLocked && !mobileSessionActive) {
     lockOrRestart();
-  } else if (event.code === "Space" && controls.isLocked) {
+  } else if (event.code === "Space" && (controls.isLocked || mobileSessionActive)) {
     jumpQueued = true;
   }
 });
@@ -509,9 +537,123 @@ window.addEventListener("resize", () => {
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
+if (isMobile && mobileControls) {
+  mobileControls.classList.remove("hidden");
+}
+
+function bindTouchButton(button, onPress, onRelease) {
+  if (!button) return;
+  const release = (event) => {
+    event.preventDefault();
+    onRelease();
+  };
+  button.addEventListener("pointerdown", (event) => {
+    event.preventDefault();
+    onPress();
+  });
+  button.addEventListener("pointerup", release);
+  button.addEventListener("pointercancel", release);
+  button.addEventListener("lostpointercapture", release);
+}
+
+bindTouchButton(
+  btnUp,
+  () => {
+    input.forward = true;
+  },
+  () => {
+    input.forward = false;
+  },
+);
+bindTouchButton(
+  btnDown,
+  () => {
+    input.backward = true;
+  },
+  () => {
+    input.backward = false;
+  },
+);
+bindTouchButton(
+  btnLeft,
+  () => {
+    input.left = true;
+  },
+  () => {
+    input.left = false;
+  },
+);
+bindTouchButton(
+  btnRight,
+  () => {
+    input.right = true;
+  },
+  () => {
+    input.right = false;
+  },
+);
+bindTouchButton(
+  btnJump,
+  () => {
+    jumpQueued = true;
+  },
+  () => {},
+);
+bindTouchButton(
+  btnShoot,
+  () => {
+    handleShoot();
+  },
+  () => {},
+);
+
+canvas.addEventListener(
+  "touchstart",
+  (event) => {
+    if (!isMobile || !state.active) return;
+    const touch = event.changedTouches[0];
+    if (!touch) return;
+    lookTouchId = touch.identifier;
+    lastTouchX = touch.clientX;
+    lastTouchY = touch.clientY;
+  },
+  { passive: true },
+);
+
+canvas.addEventListener(
+  "touchmove",
+  (event) => {
+    if (!isMobile || !state.active || lookTouchId === null) return;
+    const touch = Array.from(event.changedTouches).find((t) => t.identifier === lookTouchId);
+    if (!touch) return;
+    const dx = touch.clientX - lastTouchX;
+    const dy = touch.clientY - lastTouchY;
+    lastTouchX = touch.clientX;
+    lastTouchY = touch.clientY;
+    pitchEuler.setFromQuaternion(camera.quaternion);
+    pitchEuler.y -= dx * 0.003;
+    pitchEuler.x -= dy * 0.003;
+    pitchEuler.x = THREE.MathUtils.clamp(pitchEuler.x, -Math.PI / 2, Math.PI / 2);
+    camera.quaternion.setFromEuler(pitchEuler);
+  },
+  { passive: true },
+);
+
+canvas.addEventListener(
+  "touchend",
+  (event) => {
+    if (!isMobile || lookTouchId === null) return;
+    if (Array.from(event.changedTouches).some((t) => t.identifier === lookTouchId)) {
+      lookTouchId = null;
+    }
+  },
+  { passive: true },
+);
+
 function endGame() {
   state.alive = false;
   state.active = false;
+  mobileSessionActive = false;
   controls.unlock();
   overlay.classList.remove("hidden");
   startButton.textContent = "Restart Mission";

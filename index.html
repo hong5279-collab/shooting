@@ -32,6 +32,7 @@
         width: 100%;
         height: 100%;
         display: block;
+        touch-action: none;
       }
 
       .hud {
@@ -171,6 +172,96 @@
       .hidden {
         display: none;
       }
+
+      .mobile-controls {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        z-index: 3;
+        display: none;
+      }
+
+      .mobile-left,
+      .mobile-right {
+        position: absolute;
+        bottom: 18px;
+        pointer-events: none;
+      }
+
+      .mobile-left {
+        left: 14px;
+        width: 170px;
+        height: 170px;
+      }
+
+      .mobile-right {
+        right: 14px;
+        width: 200px;
+        height: 170px;
+      }
+
+      .touch-btn {
+        position: absolute;
+        width: 56px;
+        height: 56px;
+        border-radius: 14px;
+        border: 1px solid rgba(226, 232, 240, 0.35);
+        background: rgba(2, 6, 23, 0.45);
+        color: #e2e8f0;
+        font-weight: 700;
+        font-size: 18px;
+        pointer-events: auto;
+        touch-action: none;
+        user-select: none;
+      }
+
+      .touch-btn:active {
+        background: rgba(14, 165, 233, 0.42);
+      }
+
+      #btnUp {
+        left: 57px;
+        top: 0;
+      }
+
+      #btnLeft {
+        left: 0;
+        top: 57px;
+      }
+
+      #btnRight {
+        right: 0;
+        top: 57px;
+      }
+
+      #btnDown {
+        left: 57px;
+        bottom: 0;
+      }
+
+      #btnJump {
+        left: 10px;
+        top: 60px;
+      }
+
+      #btnShoot {
+        right: 0;
+        top: 56px;
+        width: 92px;
+        height: 62px;
+        border-radius: 16px;
+        font-size: 16px;
+      }
+
+      @media (pointer: coarse) {
+        .mobile-controls {
+          display: block;
+        }
+
+        .crosshair {
+          opacity: 0.75;
+        }
+      }
     </style>
   </head>
   <body>
@@ -190,8 +281,21 @@
       <div class="card">
         <h1>Neon Siege 3D</h1>
         <p>Survive the arena and hold off endless drones.</p>
-        <p class="controls">WASD: Move | Mouse: Look | Click: Shoot</p>
+        <p class="controls">Desktop: WASD + Mouse + Click | Mobile: Touch buttons + drag to look</p>
         <button id="startButton">Start Mission</button>
+      </div>
+    </div>
+
+    <div id="mobileControls" class="mobile-controls">
+      <div class="mobile-left">
+        <button id="btnUp" class="touch-btn" aria-label="Move forward">W</button>
+        <button id="btnLeft" class="touch-btn" aria-label="Move left">A</button>
+        <button id="btnRight" class="touch-btn" aria-label="Move right">D</button>
+        <button id="btnDown" class="touch-btn" aria-label="Move backward">S</button>
+      </div>
+      <div class="mobile-right">
+        <button id="btnJump" class="touch-btn" aria-label="Jump">J</button>
+        <button id="btnShoot" class="touch-btn" aria-label="Shoot">Fire</button>
       </div>
     </div>
 
