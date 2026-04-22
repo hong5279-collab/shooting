@@ -37,6 +37,7 @@ camera.position.set(0, 1.75, 8);
 const controls = new PointerLockControls(camera, canvas);
 scene.add(controls.getObject());
 const isMobile = window.matchMedia("(pointer: coarse)").matches;
+const supportsPointerEvents = "PointerEvent" in window;
 let mobileSessionActive = false;
 let lookTouchId = null;
 let lastTouchX = 0;
@@ -615,66 +616,73 @@ function moveJoystick(clientX, clientY) {
 }
 
 if (isMobile && joystickBase) {
-  joystickBase.addEventListener("pointerdown", (event) => {
-    event.preventDefault();
-    event.stopPropagation();
-    startJoystick(event.pointerId, event.clientX, event.clientY);
-  });
-
-  joystickBase.addEventListener("pointermove", (event) => {
-    if (joystick.activePointerId !== event.pointerId) return;
-    event.preventDefault();
-    moveJoystick(event.clientX, event.clientY);
-  });
-
-  const stopJoystickPointer = (event) => {
-    if (joystick.activePointerId !== event.pointerId) return;
-    event.preventDefault();
-    resetJoystick();
-  };
-
-  joystickBase.addEventListener("pointerup", stopJoystickPointer);
-  joystickBase.addEventListener("pointercancel", stopJoystickPointer);
-
-  joystickBase.addEventListener(
-    "touchstart",
-    (event) => {
+  if (supportsPointerEvents) {
+    joystickBase.addEventListener("pointerdown", (event) => {
       event.preventDefault();
       event.stopPropagation();
-      const touch = event.changedTouches[0];
-      if (!touch) return;
-      startJoystick(touch.identifier, touch.clientX, touch.clientY);
-    },
-    { passive: false },
-  );
+      joystickBase.setPointerCapture(event.pointerId);
+      startJoystick(event.pointerId, event.clientX, event.clientY);
+    });
 
-  joystickBase.addEventListener(
-    "touchmove",
-    (event) => {
+    joystickBase.addEventListener("pointermove", (event) => {
+      if (joystick.activePointerId !== event.pointerId) return;
+      event.preventDefault();
+      moveJoystick(event.clientX, event.clientY);
+    });
+
+    const stopJoystickPointer = (event) => {
+      if (joystick.activePointerId !== event.pointerId) return;
+      event.preventDefault();
+      if (joystickBase.hasPointerCapture(event.pointerId)) {
+        joystickBase.releasePointerCapture(event.pointerId);
+      }
+      resetJoystick();
+    };
+
+    joystickBase.addEventListener("pointerup", stopJoystickPointer);
+    joystickBase.addEventListener("pointercancel", stopJoystickPointer);
+    joystickBase.addEventListener("lostpointercapture", stopJoystickPointer);
+  } else {
+    joystickBase.addEventListener(
+      "touchstart",
+      (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        const touch = event.changedTouches[0];
+        if (!touch) return;
+        startJoystick(touch.identifier, touch.clientX, touch.clientY);
+      },
+      { passive: false },
+    );
+
+    joystickBase.addEventListener(
+      "touchmove",
+      (event) => {
+        if (joystick.activePointerId === null) return;
+        const touch = Array.from(event.changedTouches).find(
+          (t) => t.identifier === joystick.activePointerId,
+        );
+        if (!touch) return;
+        event.preventDefault();
+        moveJoystick(touch.clientX, touch.clientY);
+      },
+      { passive: false },
+    );
+
+    const stopJoystickTouch = (event) => {
       if (joystick.activePointerId === null) return;
-      const touch = Array.from(event.changedTouches).find(
+      const ended = Array.from(event.changedTouches).some(
         (t) => t.identifier === joystick.activePointerId,
       );
-      if (!touch) return;
-      event.preventDefault();
-      moveJoystick(touch.clientX, touch.clientY);
-    },
-    { passive: false },
-  );
+      if (ended) {
+        event.preventDefault();
+        resetJoystick();
+      }
+    };
 
-  const stopJoystickTouch = (event) => {
-    if (joystick.activePointerId === null) return;
-    const ended = Array.from(event.changedTouches).some(
-      (t) => t.identifier === joystick.activePointerId,
-    );
-    if (ended) {
-      event.preventDefault();
-      resetJoystick();
-    }
-  };
-
-  joystickBase.addEventListener("touchend", stopJoystickTouch, { passive: false });
-  joystickBase.addEventListener("touchcancel", stopJoystickTouch, { passive: false });
+    joystickBase.addEventListener("touchend", stopJoystickTouch, { passive: false });
+    joystickBase.addEventListener("touchcancel", stopJoystickTouch, { passive: false });
+  }
 }
 
 canvas.addEventListener(
