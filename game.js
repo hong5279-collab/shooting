@@ -520,7 +520,11 @@ canvas.addEventListener("click", () => {
   }
 });
 if (!isMobile) {
-  window.addEventListener("mousedown", handleShoot);
+  document.addEventListener("pointerdown", (event) => {
+    if (event.pointerType === "mouse") {
+      handleShoot();
+    }
+  });
 }
 
 controls.addEventListener("lock", () => {
