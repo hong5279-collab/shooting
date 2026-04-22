@@ -486,7 +486,9 @@ canvas.addEventListener("click", () => {
     lockOrRestart();
   }
 });
-window.addEventListener("mousedown", handleShoot);
+if (!isMobile) {
+  window.addEventListener("mousedown", handleShoot);
+}
 
 controls.addEventListener("lock", () => {
   initAudio();
@@ -545,15 +547,44 @@ function bindTouchButton(button, onPress, onRelease) {
   if (!button) return;
   const release = (event) => {
     event.preventDefault();
+    event.stopPropagation();
     onRelease();
   };
   button.addEventListener("pointerdown", (event) => {
     event.preventDefault();
+    event.stopPropagation();
     onPress();
   });
   button.addEventListener("pointerup", release);
   button.addEventListener("pointercancel", release);
   button.addEventListener("lostpointercapture", release);
+  button.addEventListener(
+    "touchstart",
+    (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      onPress();
+    },
+    { passive: false },
+  );
+  button.addEventListener(
+    "touchend",
+    (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      onRelease();
+    },
+    { passive: false },
+  );
+  button.addEventListener(
+    "touchcancel",
+    (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      onRelease();
+    },
+    { passive: false },
+  );
 }
 
 bindTouchButton(
