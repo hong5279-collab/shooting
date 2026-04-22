@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Neon Siege 3D</title>
+    <style>
+      :root {
+        --bg-top: #0f172a;
+        --bg-bottom: #020617;
+        --hud: #e2e8f0;
+        --accent: #22d3ee;
+        --danger: #fb7185;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+        background: radial-gradient(circle at top, var(--bg-top), var(--bg-bottom));
+        color: var(--hud);
+      }
+
+      #game {
+        width: 100%;
+        height: 100%;
+        display: block;
+      }
+
+      .hud {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+      }
+
+      .top-bar {
+        position: absolute;
+        top: 16px;
+        left: 50%;
+        transform: translateX(-50%);
+        display: flex;
+        gap: 20px;
+        background: rgba(2, 6, 23, 0.72);
+        border: 1px solid rgba(34, 211, 238, 0.35);
+        border-radius: 14px;
+        padding: 10px 16px;
+        backdrop-filter: blur(6px);
+      }
+
+      .stat {
+        font-size: 14px;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+      }
+
+      .value {
+        color: var(--accent);
+        margin-left: 6px;
+        font-weight: 700;
+      }
+
+      .health-wrap {
+        position: absolute;
+        left: 50%;
+        bottom: 28px;
+        transform: translateX(-50%);
+        width: min(460px, 72vw);
+        height: 14px;
+        border-radius: 999px;
+        background: rgba(148, 163, 184, 0.15);
+        border: 1px solid rgba(148, 163, 184, 0.35);
+        overflow: hidden;
+      }
+
+      #healthBar {
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, var(--danger), #f97316, #facc15);
+        transform-origin: left;
+        transition: transform 120ms linear;
+      }
+
+      .crosshair {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        width: 28px;
+        height: 28px;
+        transform: translate(-50%, -50%);
+      }
+
+      .crosshair::before,
+      .crosshair::after {
+        content: "";
+        position: absolute;
+        background: rgba(226, 232, 240, 0.9);
+      }
+
+      .crosshair::before {
+        left: 50%;
+        top: 3px;
+        transform: translateX(-50%);
+        width: 2px;
+        height: 22px;
+      }
+
+      .crosshair::after {
+        top: 50%;
+        left: 3px;
+        transform: translateY(-50%);
+        width: 22px;
+        height: 2px;
+      }
+
+      .overlay {
+        position: fixed;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        background: rgba(2, 6, 23, 0.78);
+        backdrop-filter: blur(3px);
+        z-index: 2;
+      }
+
+      .card {
+        width: min(600px, 90vw);
+        background: linear-gradient(140deg, rgba(15, 23, 42, 0.95), rgba(3, 7, 18, 0.95));
+        border: 1px solid rgba(34, 211, 238, 0.4);
+        border-radius: 20px;
+        padding: 28px;
+        text-align: center;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+      }
+
+      h1 {
+        margin: 0;
+        font-size: clamp(26px, 5vw, 42px);
+        letter-spacing: 0.08em;
+      }
+
+      p {
+        margin: 10px 0 0;
+        color: #cbd5e1;
+      }
+
+      .controls {
+        margin-top: 16px;
+        font-size: 13px;
+        color: #94a3b8;
+      }
+
+      button {
+        margin-top: 18px;
+        padding: 12px 22px;
+        border: none;
+        border-radius: 12px;
+        font-weight: 700;
+        cursor: pointer;
+        pointer-events: auto;
+        color: #042f2e;
+        background: linear-gradient(135deg, #67e8f9, #22d3ee);
+      }
+
+      .hidden {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="game"></canvas>
+
+    <div class="hud">
+      <div class="top-bar">
+        <div class="stat">Score <span id="score" class="value">0</span></div>
+        <div class="stat">Wave <span id="wave" class="value">1</span></div>
+        <div class="stat">Enemies <span id="enemyCount" class="value">0</span></div>
+      </div>
+      <div class="crosshair"></div>
+      <div class="health-wrap"><div id="healthBar"></div></div>
+    </div>
+
+    <div id="overlay" class="overlay">
+      <div class="card">
+        <h1>Neon Siege 3D</h1>
+        <p>Survive the arena and hold off endless drones.</p>
+        <p class="controls">WASD: Move | Mouse: Look | Click: Shoot</p>
+        <button id="startButton">Start Mission</button>
+      </div>
+    </div>
+
+    <script type="module" src="game.js"></script>
+  </body>
+</html>
