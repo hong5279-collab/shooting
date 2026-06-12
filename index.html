@@ -6,11 +6,13 @@
     <title>Neon Siege 3D</title>
     <style>
       :root {
-        --bg-top: #0f172a;
+        --bg-top: #111827;
         --bg-bottom: #020617;
         --hud: #e2e8f0;
         --accent: #22d3ee;
         --danger: #fb7185;
+        --success: #34d399;
+        --warning: #fbbf24;
       }
 
       * {
@@ -46,25 +48,56 @@
         top: 16px;
         left: 50%;
         transform: translateX(-50%);
-        display: flex;
-        gap: 20px;
-        background: rgba(2, 6, 23, 0.72);
+        display: grid;
+        grid-template-columns: repeat(5, max-content);
+        gap: 14px;
+        max-width: calc(100vw - 24px);
+        background: rgba(2, 6, 23, 0.76);
         border: 1px solid rgba(34, 211, 238, 0.35);
-        border-radius: 14px;
-        padding: 10px 16px;
+        border-radius: 8px;
+        padding: 10px 14px;
         backdrop-filter: blur(6px);
       }
 
       .stat {
         font-size: 14px;
         text-transform: uppercase;
-        letter-spacing: 0.1em;
+        letter-spacing: 0.08em;
+        white-space: nowrap;
       }
 
       .value {
         color: var(--accent);
         margin-left: 6px;
         font-weight: 700;
+      }
+
+      .value.health {
+        color: var(--success);
+      }
+
+      .value.ammo {
+        color: var(--warning);
+      }
+
+      .status-line {
+        position: absolute;
+        left: 50%;
+        top: 62px;
+        transform: translateX(-50%);
+        max-width: min(520px, calc(100vw - 32px));
+        min-height: 30px;
+        padding: 7px 12px;
+        border-radius: 8px;
+        border: 1px solid rgba(148, 163, 184, 0.22);
+        background: rgba(2, 6, 23, 0.52);
+        color: #cbd5e1;
+        font-size: 13px;
+        letter-spacing: 0.04em;
+        text-align: center;
+        text-transform: uppercase;
+        opacity: 0.94;
+        backdrop-filter: blur(6px);
       }
 
       .health-wrap {
@@ -92,32 +125,58 @@
         position: absolute;
         left: 50%;
         top: 50%;
-        width: 28px;
-        height: 28px;
+        --spread: 8px;
+        width: 72px;
+        height: 72px;
         transform: translate(-50%, -50%);
       }
 
-      .crosshair::before,
-      .crosshair::after {
-        content: "";
+      .crosshair span {
         position: absolute;
-        background: rgba(226, 232, 240, 0.9);
+        border-radius: 999px;
+        background: rgba(226, 232, 240, 0.92);
+        box-shadow: 0 0 8px rgba(34, 211, 238, 0.35);
       }
 
-      .crosshair::before {
+      .crosshair .top,
+      .crosshair .bottom {
         left: 50%;
-        top: 3px;
         transform: translateX(-50%);
         width: 2px;
-        height: 22px;
+        height: 14px;
       }
 
-      .crosshair::after {
+      .crosshair .left,
+      .crosshair .right {
         top: 50%;
-        left: 3px;
         transform: translateY(-50%);
-        width: 22px;
+        width: 14px;
         height: 2px;
+      }
+
+      .crosshair .top {
+        bottom: calc(50% + var(--spread));
+      }
+
+      .crosshair .bottom {
+        top: calc(50% + var(--spread));
+      }
+
+      .crosshair .left {
+        right: calc(50% + var(--spread));
+      }
+
+      .crosshair .right {
+        left: calc(50% + var(--spread));
+      }
+
+      .crosshair .dot {
+        left: 50%;
+        top: 50%;
+        width: 3px;
+        height: 3px;
+        transform: translate(-50%, -50%);
+        background: rgba(251, 191, 36, 0.95);
       }
 
       .overlay {
@@ -132,9 +191,9 @@
 
       .card {
         width: min(600px, 90vw);
-        background: linear-gradient(140deg, rgba(15, 23, 42, 0.95), rgba(3, 7, 18, 0.95));
+        background: linear-gradient(140deg, rgba(17, 24, 39, 0.95), rgba(3, 7, 18, 0.95));
         border: 1px solid rgba(34, 211, 238, 0.4);
-        border-radius: 20px;
+        border-radius: 8px;
         padding: 28px;
         text-align: center;
         box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
@@ -161,7 +220,7 @@
         margin-top: 18px;
         padding: 12px 22px;
         border: none;
-        border-radius: 12px;
+        border-radius: 8px;
         font-weight: 700;
         cursor: pointer;
         pointer-events: auto;
@@ -204,7 +263,7 @@
         position: absolute;
         width: 56px;
         height: 56px;
-        border-radius: 14px;
+        border-radius: 8px;
         border: 1px solid rgba(226, 232, 240, 0.35);
         background: rgba(2, 6, 23, 0.45);
         color: #e2e8f0;
@@ -254,6 +313,34 @@
         top: 60px;
       }
 
+      #btnReload {
+        right: 58px;
+        top: 2px;
+      }
+
+      #btnFire {
+        right: 0;
+        top: 2px;
+      }
+
+      @media (max-width: 720px) {
+        .top-bar {
+          grid-template-columns: repeat(3, max-content);
+          gap: 8px 12px;
+          padding: 8px 10px;
+        }
+
+        .stat {
+          font-size: 12px;
+          letter-spacing: 0.04em;
+        }
+
+        .status-line {
+          top: 82px;
+          font-size: 11px;
+        }
+      }
+
       @media (pointer: coarse) {
         .mobile-controls {
           display: block;
@@ -271,18 +358,26 @@
     <div class="hud">
       <div class="top-bar">
         <div class="stat">Score <span id="score" class="value">0</span></div>
-        <div class="stat">Wave <span id="wave" class="value">1</span></div>
-        <div class="stat">Enemies <span id="enemyCount" class="value">0</span></div>
+        <div class="stat">Round <span id="wave" class="value">1</span></div>
+        <div class="stat">Hostiles <span id="enemyCount" class="value">0</span></div>
+        <div class="stat">Health <span id="healthText" class="value health">100</span></div>
+        <div class="stat">Ammo <span id="ammo" class="value ammo">30</span><span id="reserveAmmo" class="value">90</span></div>
       </div>
-      <div class="crosshair"></div>
+      <div class="status-line" id="statusText">Ready</div>
+      <div class="crosshair" id="crosshair" aria-hidden="true">
+        <span class="top"></span>
+        <span class="right"></span>
+        <span class="bottom"></span>
+        <span class="left"></span>
+        <span class="dot"></span>
+      </div>
       <div class="health-wrap"><div id="healthBar"></div></div>
     </div>
 
     <div id="overlay" class="overlay">
       <div class="card">
         <h1>Neon Siege 3D</h1>
-        <p>Survive the arena and hold off endless drones.</p>
-        <p class="controls">Desktop: WASD + Mouse + Click | Mobile: Joystick + Jump + tap enemy to shoot</p>
+        <p>Clear hostile rounds in a close-quarters neon training site.</p>
         <button id="startButton">Start Mission</button>
       </div>
     </div>
@@ -294,6 +389,8 @@
         </div>
       </div>
       <div class="mobile-right">
+        <button id="btnFire" class="touch-btn" aria-label="Fire">F</button>
+        <button id="btnReload" class="touch-btn" aria-label="Reload">R</button>
         <button id="btnJump" class="touch-btn" aria-label="Jump">J</button>
       </div>
     </div>
