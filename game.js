@@ -51,6 +51,10 @@ let lastTouchX = 0;
 let lastTouchY = 0;
 let lookTouchMoved = false;
 let lockRequestPending = false;
+let pointerFallbackActive = false;
+let fallbackLookReady = false;
+let fallbackLastMouseX = 0;
+let fallbackLastMouseY = 0;
 const pitchEuler = new THREE.Euler(0, 0, 0, "YXZ");
 const JOYSTICK_RADIUS = 44;
 
@@ -784,6 +788,33 @@ function setJoystickFromClient(clientX, clientY) {
   setJoystickVisual(clampedX, clampedY);
 }
 
+function setGameCursorActive(active) {
+  document.body.classList.toggle("game-active", active);
+}
+
+function applyLookDelta(dx, dy, sensitivity) {
+  if (!Number.isFinite(dx) || !Number.isFinite(dy)) return;
+  if (Math.abs(dx) < 0.01 && Math.abs(dy) < 0.01) return;
+  pitchEuler.setFromQuaternion(camera.quaternion);
+  pitchEuler.y -= dx * sensitivity;
+  pitchEuler.x -= dy * sensitivity;
+  pitchEuler.x = THREE.MathUtils.clamp(pitchEuler.x, -Math.PI / 2, Math.PI / 2);
+  camera.quaternion.setFromEuler(pitchEuler);
+}
+
+function activateFallbackSession() {
+  lockRequestPending = false;
+  pointerFallbackActive = true;
+  fallbackLookReady = false;
+  initAudio();
+  if (!state.started) resetGame();
+  state.active = true;
+  overlay.classList.add("hidden");
+  setGameCursorActive(true);
+  startButton.textContent = "Resume";
+  setStatus("Mouse fallback active", 2.4);
+}
+
 function lockOrRestart() {
   if (!state.alive) resetGame();
   if (state.active && state.alive) return;
@@ -793,12 +824,22 @@ function lockOrRestart() {
     mobileSessionActive = true;
     state.active = true;
     overlay.classList.add("hidden");
+    setGameCursorActive(true);
     return;
   }
   if (document.pointerLockElement !== canvas) {
     if (lockRequestPending) return;
     lockRequestPending = true;
-    controls.lock();
+    try {
+      controls.lock();
+      window.setTimeout(() => {
+        if (lockRequestPending && document.pointerLockElement !== canvas) {
+          activateFallbackSession();
+        }
+      }, 450);
+    } catch {
+      activateFallbackSession();
+    }
   }
 }
 
@@ -819,6 +860,7 @@ canvas.addEventListener("click", () => {
 if (!isMobile) {
   document.addEventListener("pointerdown", (event) => {
     if (event.pointerType === "mouse") {
+      fallbackLookReady = false;
       if (event.button === 0) {
         input.fire = true;
         handleShoot();
@@ -833,23 +875,46 @@ if (!isMobile) {
     if (event.button === 0) input.fire = false;
     if (event.button === 2) input.aiming = false;
   });
+  document.addEventListener("mousemove", (event) => {
+    if (!state.active || controls.isLocked || !pointerFallbackActive) return;
+    if (!fallbackLookReady) {
+      fallbackLastMouseX = event.clientX;
+      fallbackLastMouseY = event.clientY;
+      fallbackLookReady = true;
+      return;
+    }
+    const dx = event.movementX || event.clientX - fallbackLastMouseX;
+    const dy = event.movementY || event.clientY - fallbackLastMouseY;
+    fallbackLastMouseX = event.clientX;
+    fallbackLastMouseY = event.clientY;
+    applyLookDelta(dx, dy, input.aiming ? 0.0015 : 0.0022);
+  });
+  canvas.addEventListener("mouseenter", () => {
+    fallbackLookReady = false;
+  });
   document.addEventListener("contextmenu", (event) => event.preventDefault());
 }
 
 controls.addEventListener("lock", () => {
   lockRequestPending = false;
+  pointerFallbackActive = false;
+  fallbackLookReady = false;
   initAudio();
   if (!state.started) resetGame();
   state.active = true;
   overlay.classList.add("hidden");
+  setGameCursorActive(true);
 });
 
 controls.addEventListener("unlock", () => {
   lockRequestPending = false;
+  pointerFallbackActive = false;
+  fallbackLookReady = false;
   mobileSessionActive = false;
   state.active = false;
   input.fire = false;
   input.aiming = false;
+  setGameCursorActive(false);
   if (state.alive) {
     overlay.classList.remove("hidden");
     startButton.textContent = "Resume";
@@ -858,13 +923,7 @@ controls.addEventListener("unlock", () => {
 });
 
 document.addEventListener("pointerlockerror", () => {
-  lockRequestPending = false;
-  initAudio();
-  if (!state.started) resetGame();
-  state.active = true;
-  overlay.classList.add("hidden");
-  startButton.textContent = "Resume";
-  setStatus("Fallback training mode", 2.4);
+  activateFallbackSession();
 });
 
 window.addEventListener("keydown", (event) => {
@@ -1047,11 +1106,7 @@ canvas.addEventListener(
     }
     lastTouchX = touch.clientX;
     lastTouchY = touch.clientY;
-    pitchEuler.setFromQuaternion(camera.quaternion);
-    pitchEuler.y -= dx * 0.003;
-    pitchEuler.x -= dy * 0.003;
-    pitchEuler.x = THREE.MathUtils.clamp(pitchEuler.x, -Math.PI / 2, Math.PI / 2);
-    camera.quaternion.setFromEuler(pitchEuler);
+    applyLookDelta(dx, dy, 0.003);
   },
   { passive: true },
 );
@@ -1087,11 +1142,14 @@ canvas.addEventListener(
 function endGame() {
   state.alive = false;
   state.active = false;
+  pointerFallbackActive = false;
+  fallbackLookReady = false;
   mobileSessionActive = false;
   input.fire = false;
   input.aiming = false;
   resetJoystick();
   controls.unlock();
+  setGameCursorActive(false);
   overlay.classList.remove("hidden");
   startButton.textContent = "Restart Mission";
 
