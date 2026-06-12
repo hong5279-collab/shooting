@@ -112,12 +112,25 @@ scene.add(camera);
 const webSplatMaterial = new THREE.MeshBasicMaterial({ color: "#f8fafc" });
 const webSplatGeometry = new THREE.SphereGeometry(0.12, 10, 10);
 const webLineMaterial = new THREE.MeshBasicMaterial({ color: "#f8fafc" });
+const ammoCrateMaterial = new THREE.MeshStandardMaterial({
+  color: "#f59e0b",
+  emissive: "#92400e",
+  roughness: 0.38,
+  metalness: 0.18,
+});
+const ammoCrateAccentMaterial = new THREE.MeshStandardMaterial({
+  color: "#111827",
+  emissive: "#7c2d12",
+  roughness: 0.5,
+  metalness: 0.2,
+});
 
 const enemies = [];
 const webSplats = [];
 const webLines = [];
 const tracers = [];
 const medkits = [];
+const ammoCrates = [];
 const clock = new THREE.Clock();
 const raycaster = new THREE.Raycaster();
 const enemyRaycaster = new THREE.Raycaster();
@@ -148,6 +161,7 @@ const state = {
   enemiesToSpawn: 0,
   roundIntermission: 0,
   medkitTimer: 6,
+  ammoCrateTimer: 4,
   shootCooldown: 0,
   ammo: 30,
   reserveAmmo: 90,
@@ -167,6 +181,10 @@ const ENEMY_TOUCH_RANGE = 1.35;
 const WALK_SPEED = 12.5;
 const MEDKIT_RADIUS = 1.4;
 const MEDKIT_HEAL = 28;
+const AMMO_CRATE_RADIUS = 1.45;
+const AMMO_CRATE_AMOUNT = 45;
+const AMMO_DROP_AMOUNT = 30;
+const AMMO_DROP_CHANCE = 0.24;
 const MAX_HEALTH = 100;
 const PLAYER_HEIGHT = 1.75;
 const PLAYER_RADIUS = 0.6;
@@ -275,6 +293,13 @@ function playHealSound() {
   playTone({ freq: 540, duration: 0.16, volume: 0.07, type: "triangle" });
 }
 
+function playAmmoSound() {
+  playTone({ freq: 360, duration: 0.07, volume: 0.06, type: "square" });
+  window.setTimeout(() => {
+    playTone({ freq: 620, duration: 0.12, volume: 0.055, type: "triangle" });
+  }, 90);
+}
+
 function playReloadSound() {
   playTone({ freq: 260, duration: 0.08, volume: 0.05, type: "square" });
   window.setTimeout(() => {
@@ -374,6 +399,23 @@ addObstacle({ x: 0, z: -6, width: 3.5, height: 1.1, depth: 2.8 });
 addObstacle({ x: -14, z: -12, width: 4.8, height: 1.3, depth: 2.6 });
 addObstacle({ x: 12, z: -8, width: 3.4, height: 1.2, depth: 2.2 });
 
+function getSupplySpawnPosition() {
+  for (let attempt = 0; attempt < 16; attempt += 1) {
+    const position = new THREE.Vector3(
+      THREE.MathUtils.randFloatSpread(86),
+      0,
+      THREE.MathUtils.randFloatSpread(86),
+    );
+    const clearOfCover = obstacles.every(({ mesh, width, depth }) => {
+      const dx = Math.abs(position.x - mesh.position.x);
+      const dz = Math.abs(position.z - mesh.position.z);
+      return dx > width / 2 + 1.2 || dz > depth / 2 + 1.2;
+    });
+    if (clearOfCover) return position;
+  }
+  return new THREE.Vector3(THREE.MathUtils.randFloatSpread(70), 0, THREE.MathUtils.randFloatSpread(70));
+}
+
 function updateHUD() {
   scoreEl.textContent = String(state.score);
   waveEl.textContent = String(state.wave);
@@ -392,6 +434,29 @@ function setStatus(message, duration = 1.7) {
   updateHUD();
 }
 
+function addAmmo(amount) {
+  let remaining = amount;
+  let added = 0;
+
+  if (state.ammo === 0 && remaining > 0) {
+    const loaded = Math.min(WEAPON.magazineSize, remaining);
+    state.ammo += loaded;
+    remaining -= loaded;
+    added += loaded;
+    state.reloading = false;
+    state.reloadTimer = 0;
+  }
+
+  if (remaining > 0) {
+    const reserveSpace = WEAPON.maxReserveAmmo - state.reserveAmmo;
+    const reserveAdded = Math.min(reserveSpace, remaining);
+    state.reserveAmmo += reserveAdded;
+    added += reserveAdded;
+  }
+
+  return added;
+}
+
 function updateCrosshair() {
   const spread = getCurrentSpread();
   const gap = THREE.MathUtils.clamp(7 + spread * 760 + state.gunKick * 8, 7, 34);
@@ -404,6 +469,7 @@ function prepareRound(round) {
   state.spawnTimer = 0.65;
   state.roundIntermission = 0;
   state.medkitTimer = Math.max(5.5, 8 - round * 0.25);
+  state.ammoCrateTimer = Math.max(3, 5.5 - round * 0.2);
   const reserveBonus = Math.min(WEAPON.maxReserveAmmo, 18 + round * 4);
   state.reserveAmmo = Math.min(WEAPON.maxReserveAmmo, state.reserveAmmo + reserveBonus);
   if (state.ammo === 0 && state.reserveAmmo > 0) {
@@ -467,6 +533,8 @@ function resetGame() {
   tracers.length = 0;
   medkits.forEach((kit) => scene.remove(kit.mesh));
   medkits.length = 0;
+  ammoCrates.forEach((crate) => scene.remove(crate.mesh));
+  ammoCrates.length = 0;
 
   camera.position.set(0, PLAYER_HEIGHT, 8);
   camera.quaternion.identity();
@@ -480,6 +548,7 @@ function resetGame() {
   state.enemiesToSpawn = 0;
   state.roundIntermission = 0;
   state.medkitTimer = 5;
+  state.ammoCrateTimer = 4;
   state.shootCooldown = 0;
   state.ammo = WEAPON.magazineSize;
   state.reserveAmmo = WEAPON.maxReserveAmmo;
@@ -632,15 +701,33 @@ function spawnMedkit() {
     new THREE.CylinderGeometry(0.35, 0.35, 0.18, 16),
     new THREE.MeshStandardMaterial({ color: "#22c55e", emissive: "#166534" }),
   );
-  mesh.position.set(
-    THREE.MathUtils.randFloatSpread(90),
-    0.18,
-    THREE.MathUtils.randFloatSpread(90),
-  );
+  const position = getSupplySpawnPosition();
+  mesh.position.set(position.x, 0.18, position.z);
   mesh.castShadow = true;
   mesh.receiveShadow = true;
   scene.add(mesh);
   medkits.push({ mesh, pulse: Math.random() * Math.PI * 2 });
+}
+
+function spawnAmmoCrate(position = null, amount = AMMO_CRATE_AMOUNT) {
+  const spawnPosition = position ? position.clone() : getSupplySpawnPosition();
+  const crate = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.BoxGeometry(0.82, 0.34, 0.52), ammoCrateMaterial);
+  body.position.y = 0.22;
+  const strap = new THREE.Mesh(new THREE.BoxGeometry(0.88, 0.08, 0.12), ammoCrateAccentMaterial);
+  strap.position.y = 0.43;
+  const rounds = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.34, 10), ammoCrateAccentMaterial);
+  rounds.rotation.z = Math.PI / 2;
+  rounds.position.set(0, 0.55, 0.02);
+
+  crate.add(body, strap, rounds);
+  crate.position.set(spawnPosition.x, 0.02, spawnPosition.z);
+  crate.children.forEach((part) => {
+    part.castShadow = true;
+    part.receiveShadow = true;
+  });
+  scene.add(crate);
+  ammoCrates.push({ mesh: crate, amount, pulse: Math.random() * Math.PI * 2 });
 }
 
 function spawnWebSplat(position) {
@@ -704,7 +791,11 @@ function handleShoot(aimPoint = null) {
   }
   if (state.ammo <= 0) {
     playEmptySound();
-    startReload();
+    if (state.reserveAmmo > 0) {
+      startReload();
+    } else {
+      setStatus("Find ammo crate", 1.2);
+    }
     return;
   }
 
@@ -741,9 +832,13 @@ function handleShoot(aimPoint = null) {
       enemy.webbed = Math.min((enemy.webbed || 0) + 0.8, 2);
 
       if (enemy.hp <= 0) {
+        const dropPosition = enemy.mesh.position.clone();
         scene.remove(enemy.mesh);
         enemies.splice(enemies.indexOf(enemy), 1);
         state.score += enemy.score + (hitZone === "head" ? 8 : 0);
+        if (ammoCrates.length < 5 && Math.random() < AMMO_DROP_CHANCE) {
+          spawnAmmoCrate(dropPosition, AMMO_DROP_AMOUNT);
+        }
         setStatus(hitZone === "head" ? "Headshot neutralized" : "Hostile neutralized", 1.0);
       } else if (hitZone === "head") {
         setStatus("Headshot", 0.7);
@@ -1379,8 +1474,13 @@ function updateSpawning(delta) {
 
   state.spawnTimer -= delta;
   state.medkitTimer -= delta;
+  state.ammoCrateTimer -= delta;
   const maxEnemies = Math.min(4 + Math.ceil(state.wave * 1.25), 12);
   const spawnInterval = Math.max(1.05 - state.wave * 0.045, 0.44);
+  const ammoPressure = state.ammo === 0 || state.reserveAmmo <= WEAPON.magazineSize;
+  if (ammoPressure) {
+    state.ammoCrateTimer = Math.min(state.ammoCrateTimer, 1.2);
+  }
 
   if (state.spawnTimer <= 0 && state.enemiesToSpawn > 0 && enemies.length < maxEnemies) {
     spawnEnemy();
@@ -1398,6 +1498,15 @@ function updateSpawning(delta) {
   if (state.medkitTimer <= 0 && medkits.length < 4) {
     spawnMedkit();
     state.medkitTimer = Math.max(9 - state.wave * 0.4, 5.5);
+  }
+
+  if (
+    state.ammoCrateTimer <= 0 &&
+    ammoCrates.length < 3 &&
+    (state.reserveAmmo < WEAPON.maxReserveAmmo || state.ammo === 0)
+  ) {
+    spawnAmmoCrate();
+    state.ammoCrateTimer = Math.max(8 - state.wave * 0.32, 4.5);
   }
 }
 
@@ -1487,8 +1596,31 @@ function updateMedkits(delta) {
     if (distance < MEDKIT_RADIUS) {
       state.health = Math.min(MAX_HEALTH, state.health + MEDKIT_HEAL);
       playHealSound();
+      setStatus(`Health +${MEDKIT_HEAL}`, 1.1);
       scene.remove(kit.mesh);
       medkits.splice(i, 1);
+      updateHUD();
+    }
+  }
+}
+
+function updateAmmoCrates(delta) {
+  if (!state.active) return;
+  for (let i = ammoCrates.length - 1; i >= 0; i -= 1) {
+    const crate = ammoCrates[i];
+    crate.pulse += delta * 3.2;
+    crate.mesh.rotation.y += delta * 0.75;
+    crate.mesh.position.y = 0.02 + Math.sin(crate.pulse) * 0.035;
+    const dx = crate.mesh.position.x - camera.position.x;
+    const dz = crate.mesh.position.z - camera.position.z;
+    const distance = Math.hypot(dx, dz);
+    if (distance < AMMO_CRATE_RADIUS) {
+      const added = addAmmo(crate.amount);
+      if (added <= 0) continue;
+      playAmmoSound();
+      setStatus(`Ammo +${added}`, 1.2);
+      scene.remove(crate.mesh);
+      ammoCrates.splice(i, 1);
       updateHUD();
     }
   }
@@ -1505,6 +1637,7 @@ function animate() {
   updateEnemies(delta);
   updateEffects(timerDelta);
   updateMedkits(delta);
+  updateAmmoCrates(delta);
 
   renderer.render(scene, camera);
 }
