@@ -1,6 +1,6 @@
 # Neon Siege 3D
 
-A lightweight 3D browser shooting game built with Three.js.
+A lightweight tactical 3D browser shooting game built with Three.js.
 
 ## Run
 
@@ -13,5 +13,9 @@ A lightweight 3D browser shooting game built with Three.js.
 
 - `W A S D`: Move
 - `Mouse`: Look around
-- `Click`: Shoot
+- `Hold Click`: Fire
+- `Right Click`: Aim
+- `R`: Reload
 - `Space`: Re-lock pointer if paused
+- `Space`: Jump while playing
+- Mobile: joystick, fire, reload, and jump buttons
