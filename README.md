@@ -19,3 +19,8 @@ A lightweight tactical 3D browser shooting game built with Three.js.
 - `Space`: Re-lock pointer if paused
 - `Space`: Jump while playing
 - Mobile: joystick, fire, reload, and jump buttons
+
+## Supplies
+
+- Green medkits restore health.
+- Orange ammo crates refill reserve ammo and emergency-load the magazine when empty.
